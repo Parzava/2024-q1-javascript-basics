@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            background-color: #000;
+        }
+    </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const map = [
+    [1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1],
+];
+
+const player = {
+    x: 1.5,
+    y: 1.5,
+    angle: 0,
+    speed: 0.03,
+    turnSpeed: 0.05
+};
+
+const fov = Math.PI / 3; // Field of View
+const numRays = canvas.width / 2; // Number of rays
+const maxDepth = 8; // Maximum rendering distance
+
+function drawScene() {
+    for (let i = 0; i < numRays; i++) {
+        const rayAngle = player.angle - fov / 2 + (i / numRays) * fov;
+        let distanceToWall = 0;
+        let hitWall = false;
+
+        const stepSize = 0.1; // Increment size for ray
+        while (!hitWall && distanceToWall < maxDepth) {
+            distanceToWall += stepSize;
+            const testX = Math.floor(player.x + Math.cos(rayAngle) * distanceToWall);
+            const testY = Math.floor(player.y + Math.sin(rayAngle) * distanceToWall);
+
+            if (testX < 0 || testX >= map[0].length || testY < 0 || testY >= map.length) {
+                hitWall = true; // Ray is out of bounds
+                distanceToWall = maxDepth;
+            } else if (map[testX][testY] === 1) {
+                hitWall = true; // Wall is hit
+            }
+        }
+
+        const wallHeight = Math.floor(canvas.height / distanceToWall);
+        const wallTop = Math.floor((canvas.height - wallHeight) / 2);
+        const wallColor = `rgb(${255 - distanceToWall * 32}, 0, 0)`;
+
+        ctx.fillStyle = wallColor;
+        ctx.fillRect(i * 2, wallTop, 2, wallHeight);
+    }
+}
+
+function update() {
+    if (keys['ArrowUp']) {
+        player.x += Math.cos(player.angle) * player.speed;
+        player.y += Math.sin(player.angle) * player.speed;
+    }
+    if (keys['ArrowDown']) {
+        player.x -= Math.cos(player.angle) * player.speed;
+        player.y -= Math.sin(player.angle) * player.speed;
+    }
+    if (keys['ArrowLeft']) {
+        player.angle -= player.turnSpeed;
+    }
+    if (keys['ArrowRight']) {
+        player.angle += player.turnSpeed;
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawScene();
+
+    requestAnimationFrame(update);
+}
+
+const keys = {};
+window.addEventListener('keydown', (e) => keys[e.key] = true);
+window.addEventListener('keyup', (e) => keys[e.key] = false);
+
+update();
+</script>
+</body>
+</html>
