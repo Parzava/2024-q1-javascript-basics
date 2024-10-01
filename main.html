@@ -1,108 +1,190 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple</title>
+    <title>3D Maze Game</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
+            font-family: Arial, sans-serif;
         }
+
         canvas {
             display: block;
             background-color: #000;
         }
+
+        .hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 18px;
+        }
     </style>
 </head>
+
 <body>
-<canvas id="gameCanvas"></canvas>
+    <div class="hud">
+        FPS: <span id="fps">0</span>
+    </div>
+    <canvas id="gameCanvas"></canvas>
 
-<script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-const map = [
-    [1, 1, 1, 1, 1, 1, 1, 1],
-    [1, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 1],
-    [1, 1, 1, 1, 1, 1, 1, 1],
-];
+        const map = [
+            [1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1],
+        ];
 
-const player = {
-    x: 1.5,
-    y: 1.5,
-    angle: 0,
-    speed: 0.03,
-    turnSpeed: 0.05
-};
+        const textures = new Image();
+        textures.src = 'textures.png'; // Add a texture image sprite (e.g., with wall textures in grid format)
 
-const fov = Math.PI / 3; // Field of View
-const numRays = canvas.width / 2; // Number of rays
-const maxDepth = 8; // Maximum rendering distance
+        const gunImage = new Image();
+        gunImage.src = 'gun.png'; // Path to gun image
 
-function drawScene() {
-    for (let i = 0; i < numRays; i++) {
-        const rayAngle = player.angle - fov / 2 + (i / numRays) * fov;
-        let distanceToWall = 0;
-        let hitWall = false;
+        const player = {
+            x: 1.5,
+            y: 1.5,
+            angle: 0,
+            speed: 1,
+            turnSpeed: 1
+        };
 
-        const stepSize = 0.1; // Increment size for ray
-        while (!hitWall && distanceToWall < maxDepth) {
-            distanceToWall += stepSize;
-            const testX = Math.floor(player.x + Math.cos(rayAngle) * distanceToWall);
-            const testY = Math.floor(player.y + Math.sin(rayAngle) * distanceToWall);
+        const fov = Math.PI / 3; // Field of View
+        const wallSize = 100; // Define a fixed size for each wall section
 
-            if (testX < 0 || testX >= map[0].length || testY < 0 || testY >= map.length) {
-                hitWall = true; // Ray is out of bounds
-                distanceToWall = maxDepth;
-            } else if (map[testX][testY] === 1) {
-                hitWall = true; // Wall is hit
+        let lastTime = 0;
+        let fpsDisplay = document.getElementById('fps');
+
+        const keys = {};
+        const bullets = [];
+        const bulletSpeed = 0.1;
+
+        // Collision Detection: Prevent player from walking through walls
+        function isColliding(x, y) {
+            return map[Math.floor(x)][Math.floor(y)] === 1;
+        }
+
+        function movePlayer(deltaTime) {
+            const moveX = Math.cos(player.angle) * player.speed * deltaTime;
+            const moveY = Math.sin(player.angle) * player.speed * deltaTime;
+
+            if (keys['ArrowUp']) {
+                const nextX = player.x + moveX;
+                const nextY = player.y + moveY;
+                if (!isColliding(nextX, player.y)) player.x = nextX;
+                if (!isColliding(player.x, nextY)) player.y = nextY;
+            }
+            if (keys['ArrowDown']) {
+                const nextX = player.x - moveX;
+                const nextY = player.y - moveY;
+                if (!isColliding(nextX, player.y)) player.x = nextX;
+                if (!isColliding(player.x, nextY)) player.y = nextY;
+            }
+            if (keys['ArrowLeft']) player.angle -= player.turnSpeed * deltaTime;
+            if (keys['ArrowRight']) player.angle += player.turnSpeed * deltaTime;
+        }
+
+        // Function to draw gun image
+        function drawGun() {
+            const gunWidth = canvas.width / 6;
+            const gunHeight = gunWidth * 1.5;
+            const gunX = canvas.width / 2 - gunWidth / 2;
+            const gunY = canvas.height - gunHeight;
+
+            ctx.drawImage(gunImage, gunX, gunY, gunWidth, gunHeight);
+        }
+
+        // Shooting Mechanic: Create bullets and render them
+        function shoot() {
+            bullets.push({
+                x: player.x,
+                y: player.y,
+                angle: player.angle
+            });
+        }
+
+        function drawBullets(deltaTime) {
+            bullets.forEach((bullet, index) => {
+                bullet.x += Math.cos(bullet.angle) * bulletSpeed * deltaTime;
+                bullet.y += Math.sin(bullet.angle) * bulletSpeed * deltaTime;
+
+                ctx.fillStyle = 'yellow';
+                ctx.beginPath();
+                ctx.arc(bullet.x * 50, bullet.y * 50, 5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Remove bullet if it hits a wall
+                if (isColliding(bullet.x, bullet.y)) {
+                    bullets.splice(index, 1);
+                }
+            });
+        }
+
+        // Draw static walls without 3D perspective
+        function drawWalls() {
+            for (let row = 0; row < map.length; row++) {
+                for (let col = 0; col < map[row].length; col++) {
+                    if (map[row][col] === 1) {
+                        const wallX = col * wallSize;
+                        const wallY = row * wallSize;
+
+                        // Draw wall as a static rectangle
+                        ctx.fillStyle = 'gray';
+                        ctx.fillRect(wallX, wallY, wallSize, wallSize);
+                    }
+                }
             }
         }
 
-        const wallHeight = Math.floor(canvas.height / distanceToWall);
-        const wallTop = Math.floor((canvas.height - wallHeight) / 2);
-        const wallColor = `rgb(${255 - distanceToWall * 32}, 0, 0)`;
+        function update(currentTime) {
+            if (!lastTime) lastTime = currentTime;
+            const deltaTime = (currentTime - lastTime) / 1000; // Time in seconds
+            lastTime = currentTime;
 
-        ctx.fillStyle = wallColor;
-        ctx.fillRect(i * 2, wallTop, 2, wallHeight);
-    }
-}
+            // FPS calculation
+            const fps = Math.floor(1 / deltaTime);
+            fpsDisplay.textContent = fps;
 
-function update() {
-    if (keys['ArrowUp']) {
-        player.x += Math.cos(player.angle) * player.speed;
-        player.y += Math.sin(player.angle) * player.speed;
-    }
-    if (keys['ArrowDown']) {
-        player.x -= Math.cos(player.angle) * player.speed;
-        player.y -= Math.sin(player.angle) * player.speed;
-    }
-    if (keys['ArrowLeft']) {
-        player.angle -= player.turnSpeed;
-    }
-    if (keys['ArrowRight']) {
-        player.angle += player.turnSpeed;
-    }
+            movePlayer(deltaTime);
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawScene();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawWalls(); // Draw static walls
+            drawBullets(deltaTime);
+            drawGun(); // Draw the gun after the scene
 
-    requestAnimationFrame(update);
-}
+            requestAnimationFrame(update);
+        }
 
-const keys = {};
-window.addEventListener('keydown', (e) => keys[e.key] = true);
-window.addEventListener('keyup', (e) => keys[e.key] = false);
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (e.key === ' ') {
+                shoot(); // Shoot bullet on spacebar press
+            }
+        });
+        window.addEventListener('keyup', (e) => keys[e.key] = false);
 
-update();
-</script>
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        update();
+    </script>
 </body>
+
 </html>

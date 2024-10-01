@@ -12,4 +12,16 @@
 
 		<script src="scripts/variables.js"></script>
 	</body>
-</html>
+	var then = 0;
+	function render(time) {
+	   var timeInSeconds = time * 0.001;
+	   var deltaTimeInSeconds = timeInSeconds - then;
+	   then = timeInSeconds;
+	
+	   xPosition = xPosition + velocityInUnitsPerSecond * deltaTimeInSeconds;
+	
+	   ...
+	
+	   requestAnimationFrame(render);
+	}
+	requestAnimationFrame(render);
